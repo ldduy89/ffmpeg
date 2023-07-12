@@ -80,8 +80,9 @@ const readTxt = () => {
       return response.json();
     })
     .then((value) => {
-      const query = `ffmpeg -i  "${value.data.url}" -c copy -bsf:a aac_adtstoasc pikachu.mp4`;
-      promiseExec(query);
+      const query = `ffmpeg -i "${value.data.url}" -c copy -bsf:a aac_adtstoasc pikachu.mp4`;
+      console.log(query);
+      promiseExec(query).then();
     })
     .catch((err) => {
       console.log(err);
