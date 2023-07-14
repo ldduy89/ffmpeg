@@ -154,11 +154,7 @@ const downVod = async (item, index, path) => {
       resolve();
     }, 500);
   });
-  await promiseExec(`ffmpeg -i ${URL} -c copy -bsf:a aac_adtstoasc ${path}/${index < 10 ? `00${index}` : index < 100 ? `0${index}` : index}.mp4`);
-};
-
-const stringNumber = (index) => {
-  return `${index < 10 ? `000${index}` : index < 100 ? `00${index}` : index < 1000 ? `0${index}` : index}`;
+  await promiseExec(`ffmpeg -i ${URL} -c copy -bsf:a aac_adtstoasc ${path}/${fotmatNumber(index)}.mp4`);
 };
 
 const toTimeNumber = (str) => {
@@ -176,11 +172,11 @@ const toTimeStr = (number) => {
 
 const createVodFromSub = async (pathFileSub) => {
   const arrText = fsExtra.readFileSync(pathFileSub, "utf8").split("\n");
-  const name = _.replace(_.last(_.split(pathFileSub, "\\")), ".srt", "");
+  const name = _.replace(_.last(_.split(pathFileSub, "/")), ".srt", "");
   try {
     fsExtra.mkdirSync("./download/" + _.kebabCase(name));
     await promiseExec(`ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t 00:10:00 -q:a 9 -acodec libmp3lame out.mp3`);
-  } catch (error) {}
+  } catch (error) { }
   const arr = [];
   arrText.forEach((t, index) => {
     if (t.includes("-->")) {
@@ -195,28 +191,35 @@ const createVodFromSub = async (pathFileSub) => {
     const newTime = toTimeStr(toTimeNumber(time.split(" --> ")[1]) + 10000);
     await promiseExec(`ffmpeg -f lavfi -i anullsrc=r=44100:cl=mono -t ${newTime} -q:a 9 -acodec libmp3lame ./download/${_.kebabCase(name)}/all.mp3`);
   }
-
+  const arr2 = [];
+  try {
+    fsExtra.mkdirSync("./download/" + _.kebabCase(name));
+  } catch (error) { }
+  let file = arr.join('\n')
+  do {
+    const lastIndexN = file.lastIndexOf("\n", 500);
+    const lastIndexDoc = file.lastIndexOf(".", 500);
+    const lastIndex = file.length > 500 ? (lastIndexDoc ? lastIndexN : lastIndexDoc) : file.length;
+    const text = file.substring(0, lastIndex + 1);
+    arr2.push(text);
+    file = file.substring(lastIndex, file.length);
+  } while (file.length > 0);
+  console.log(arr2);
   let audios = fsExtra.readdirSync("./download/" + _.kebabCase(name), "utf8").filter((f) => !f.includes("all"));
   audios = _.orderBy(audios, (o) => Number(o.replace(".mp4", "")));
-  // for (let i = Number(_.last(audios)?.replace('.mp4', '') || -1) + 1; i < arr.length; i++) {
-  //   await downVod(arr[i], i, './download/' + _.kebabCase(name));
-  // }
-
-  // for (let i = 63; i < 64; i++) {
-  //   await downVod(arr[i], i, './download/' + _.kebabCase(name));
-  // }
+  for (let i = Number(_.last(audios)?.replace('.mp4', '') || -1) + 1; i < 1; i++) {
+    await downVod(arr2[i], i, './download/' + _.kebabCase(name));
+  }
 };
-// createVodFromSub("F:\\Battle Through The Heavens 5 - 52.srt");
+createVodFromSub("./dptk52.srt");
 
 const concatVod = async (pathFileSub) => {
   const arrText = fsExtra.readFileSync(pathFileSub, "utf8").split("\n");
-  const name = _.replace(_.last(_.split(pathFileSub, "\\")), ".srt", "");
+  const name = _.replace(_.last(_.split(pathFileSub, "/")), ".srt", "");
   const arr = [];
   arrText.forEach((t, index) => {
     if (t.includes("-->")) {
       const newTime = toTimeNumber(t.split(" --> ")[0]);
-      // console.log(newTime);
-      // const str = [arrText[index + 1], arrText[index + 2]].join("\n").trim();
       arr.push(newTime);
     }
   });
@@ -228,55 +231,27 @@ const concatVod = async (pathFileSub) => {
     (o) => Number(o.replace(".mp3", ""))
   );
   const index = Number(fileAll.replace(".mp3", "").split("_")[1] || -1);
-  let nextAll = fileAll;
   const options = [];
   for (let i = index + 1; i < audios.length; i++) {
     const audio = audios[i];
-    const newTime = arr[i];
+    const newTime = arr[i] / 1000;
     const audioFile = fs.readFileSync(path + "/" + audio);
     const option = _.last(options);
-    // console.log( Number(newTime),Number(option?.end || 0),Number(newTime) -  Number(option?.end || 0));
-    const delay = Number(newTime) - Number(option?.end || 0) + 50;
-    options.push({
-      name: audio,
-      delay: delay < 0 ? 0 : delay,
-      cast: getMP3Duration(audioFile),
-      newTime,
-      end: (delay < 0 ? Number(option?.end || 0) : newTime) + getMP3Duration(audioFile)
-    });
+    const time = option && option.time + option.cast > newTime ? option.time + option.cast : newTime;
+    options.push({ name: audio, time, cast: getMP3Duration(audioFile) / 1000 });
   }
-  // console.log(options)
-  // console.log(`ffmpeg -i ${path}/all.mp3 ${options.map(o => `-i ${path}/${o.name}`).join(' ')} -filter_complex "${options.map((o, i) => `[0:a]atrim=end=${o.delay/1000}[b${i}];[${i+1}:a]asetpts=[i${i}]`).join(';')};[0:a]atrim=start=${_.last(options).end/1000}[b${options.length}];${options.map((o, i) => `[b${i}][i${i}]`).join('')}[b${options.length}]concat=n=${options.length*2 +1}:v=0:a=1" ${path}/all_.mp3`);
-  await promiseExec(`ffmpeg -i ${path}/all.mp3 ${options.map(o => `-i ${path}/${o.name}`).join(' ')} -filter_complex "${options.map((o, i) => `[0:a]atrim=end=${o.delay/1000}[b${i}];[${i+1}:a]asetpts=[i${i}]`).join(';')};[0:a]atrim=start=${_.last(options).end/1000}[b${options.length}];${options.map((o, i) => `[b${i}][i${i}]`).join('')}[b${options.length}]concat=n=${options.length*2 +1}:v=0:a=1" ${path}/all_.mp3`)
-  // const opto
-  for (let i = index + 1; i < audios.length; i++) {
-    const audio = audios[i];
-    // const newTime = arr[i];
-    // const audioFile = fs.readFileSync(path+'/'+audio);
-    // await promiseExec(`ffmpeg -i ${path}/${audio} ${path}/${audio.replace('mp4','mp3')}`)
-    // console.log(audio, getMP3Duration(audioFile), 'ms');
-    // console.log(`ffmpeg -i ${path}/all.mp3 -i ${path}/${audio} -filter_complex "[0:a]atrim=end=35[a];[1:a]asetpts=[b];[0:a]atrim=start=35[c];[a][b][c]concat=n=3:v=0:a=1[out]" -map "[out]" ${path}/output.mp3`);
-    // await promiseExec(`ffmpeg -i ${path}/${nextAll} -i ${path}/${audio} -filter_complex "[0:a]atrim=end=${newTime}[a];[1:a]asetpts=[b];[0:a]atrim=start=${newTime+0.1}[c];[a][b][c]concat=n=3:v=0:a=1" ${path}/all_${stringNumber(i)}.mp3`);
-    // console.log(stringNumber(i));
-    // fsExtra.removeSync(`${path}/${nextAll}`);
-    // nextAll = `all_${stringNumber(i)}.mp3`;
-    // console.log('remove', fileAll)
-    // fs.renameSync(`${path}/output.mp3`,`${path}/all_${stringNumber(i)}.mp3`);
-    // await new Promise((resolve, reject) => {
-    //   setTimeout(() => {
-    //     resolve();
-    //   }, 5000);
-    // });
-  }
+  const query = `ffmpeg -i ${path}/all.mp3 ${options.map(o => `-i ${path}/${o.name}`).join(' ')} -filter_complex "${options.map((o, i) => `[${i === 0 ? '0:a' : `c${i - 1}`}]atrim=0:${o.time}[a${i}];[0:a]atrim=0:${(options[i + 1]?.time || o.time) - o.time + 10}[b${i}];[a${i}][${i + 1}:a][b${i}]concat=n=3:v=0:a=1[c${i}]`).join(';')}" -map "[c${options.length - 1}]" ${path}/all_.mp3`
+  await promiseExec(query);
+
 };
-concatVod("F:\\Battle Through The Heavens 5 - 52.srt");
+// concatVod("./Battle Through The Heavens 5 - 52.srt");
 
 const createVodFromText = async (pathFileSub) => {
   const name = _.replace(_.last(_.split(pathFileSub, "\\")), ".txt", "");
   const arr = [];
   try {
     fsExtra.mkdirSync("./download/" + _.kebabCase(name));
-  } catch (error) {}
+  } catch (error) { }
   do {
     const lastIndexN = file.lastIndexOf("\n", 500);
     const lastIndexDoc = file.lastIndexOf(".", 500);
