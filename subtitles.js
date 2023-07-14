@@ -99,10 +99,15 @@ const createSub = (path, fName) => {
       const times = files[index].split("__");
       const time1s = times[0].split("_");
       const time2s = times[1].split("_");
-      subtitleArr.push(index + 1);
-      subtitleArr.push(`0${time1s[0]}:${time1s[1]}:${time1s[2]},${time1s[3]} --> 0${time2s[0]}:${time2s[1]}:${time2s[2]},${time2s[3]}`);
-      subtitleArr.push(text.trim());
-      subtitleArr.push("");
+      if (index > 0 && text.trim() === arrText[index - 1].trim()) {
+        const timeTr = subtitleArr[subtitleArr.length - 3];
+        subtitleArr[subtitleArr.length - 3] = `${timeTr.split(" --> ")[0]} --> 0${time2s[0]}:${time2s[1]}:${time2s[2]},${time2s[3]}`
+      } else {
+        subtitleArr.push(index + 1);
+        subtitleArr.push(`0${time1s[0]}:${time1s[1]}:${time1s[2]},${time1s[3]} --> 0${time2s[0]}:${time2s[1]}:${time2s[2]},${time2s[3]}`);
+        subtitleArr.push(text.trim());
+        subtitleArr.push("");
+      }
     }
   });
   fsExtra.writeFileSync(`${Subtitle}\\${fName}.srt`, subtitleArr.join("\n"));
