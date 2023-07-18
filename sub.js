@@ -94,6 +94,7 @@ const createSub = (path, fName) => {
   console.log(arrText.length);
 
   const subtitleArr = [];
+  let number = 1;
   arrText.forEach((text, index) => {
     if (!_.isEmpty(text.trim())) {
       const times = files[index].split("__");
@@ -103,10 +104,11 @@ const createSub = (path, fName) => {
         const timeTr = subtitleArr[subtitleArr.length - 3];
         subtitleArr[subtitleArr.length - 3] = `${timeTr.split(" --> ")[0]} --> 0${time2s[0]}:${time2s[1]}:${time2s[2]},${time2s[3]}`
       } else {
-        subtitleArr.push(index + 1);
+        subtitleArr.push(number);
         subtitleArr.push(`0${time1s[0]}:${time1s[1]}:${time1s[2]},${time1s[3]} --> 0${time2s[0]}:${time2s[1]}:${time2s[2]},${time2s[3]}`);
         subtitleArr.push(text.trim());
         subtitleArr.push("");
+        number++;
       }
     }
   });
@@ -237,7 +239,7 @@ if (arg === "createImage") {
   }
 } else if (arg === "setDelayAllTime") {
   if (param1 && param2 && param3) {
-    setDelayAllTime(`F:\\XDCYV\\${param1}.srt`, param2, param3);
+    setDelayAllTime(param1, param2, param3);
   }
 } else if (arg === "readDocx") {
   readDocx();
