@@ -7,7 +7,7 @@ const mergeImg = require("merge-img");
 const WordExtractor = require("word-extractor");
 const { async } = require("rxjs");
 
-const RGBImages = "C:\\Users\\Duy\\Downloads\\VideoSubFinder\\VideoSubFinder_5.60_x64\\Release_x64\\RGBImages";
+const RGBImages = "C:\\Users\\Duy\\Downloads\\VideoSubFinder_6.10_x64\\Release_x64\\RGBImages";
 const TXTImages = "C:\\Users\\Duy\\Downloads\\VideoSubFinder\\VideoSubFinder_5.60_x64\\Release_x64\\TXTImages";
 const TXTResults = "C:\\Users\\Duy\\Downloads\\VideoSubFinder\\VideoSubFinder_5.60_x64\\Release_x64\\TXTResults";
 const Subtitle = "C:\\Users\\Duy\\Downloads\\Subtitle";
@@ -91,12 +91,12 @@ const createSub = (path, fName) => {
 
   const arrText = fsExtra.readFileSync(path, "utf8").split("12345678987654321");
   let files = fsExtra.readFileSync(`${Subtitle}\\${fName}\\time.txt`, "utf8").split("\n");
-  console.log(arrText.length);
-
+  console.log(arrText.length, files.length);
   const subtitleArr = [];
   let number = 1;
   arrText.forEach((text, index) => {
     if (!_.isEmpty(text.trim())) {
+      // console.log(files[index]);
       const times = files[index].split("__");
       const time1s = times[0].split("_");
       const time2s = times[1].split("_");

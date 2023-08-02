@@ -87,7 +87,7 @@ const concat = async (path = outputPath) => {
   }
 };
 
-const donwloadVideo = async (link, array, name = "") => {
+const downloadVideo = async (link, array, name = "") => {
   const arr = array.split(",");
   console.log(arr);
   await Promise.all(
@@ -98,13 +98,19 @@ const donwloadVideo = async (link, array, name = "") => {
   );
 };
 
-const reName = async () => {
-  const path = "F:\\XDCYV";
-  const files = fs.readdirSync(path).filter((f) => f.includes(".mp4") && f.includes(".HD1080p"));
-  console.log(files);
+const reName = async (path, str) => {
+  // const path = "F:\\XDCYV";
+  const files = fs.readdirSync(path);
+  const arrStr = str.split(',')
+  console.log(arrStr);
   files.forEach((file, i) => {
-    const index = i + 9;
-    const name = `${index + 1 < 10 ? "0" : ""}${index + 1}.mp4`;
+    // const index = i + 9;
+    // console.log(str);
+    let name = file;
+    arrStr.forEach(s =>{
+      name = name.replace(s, '');
+    })
+    console.log(name);
     fs.renameSync(path + "\\" + file, path + "\\" + name);
   });
 };
@@ -118,4 +124,9 @@ if (arg === "covert") {
   covertVideo(param1, param2, param3);
 } else if (arg === "concat") {
   concat(param1);
+} else if (arg === "down") {
+  downloadVideo(param1, param2, param3);
+} else if (arg === "removeName") {
+  reName(param1, param2);
 }
+
