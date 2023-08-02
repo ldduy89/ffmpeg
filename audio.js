@@ -32,10 +32,10 @@ const promiseExec = (query) => {
         .map((i) => _.trim(i, '"'))
     );
     ffmpeg.stdout.on("data", (data) => {
-      console.log(`stdout: ${data}`);
+      // console.log(`stdout: ${data}`);
     });
     ffmpeg.stderr.on("data", (data) => {
-      console.error(`stderr: ${data}`);
+      // console.error(`stderr: ${data}`);
     });
     ffmpeg.on("close", (code) => {
       console.log(`child process exited with code ${code}`);
@@ -82,11 +82,11 @@ const reName = async () => {
     fs.renameSync(path + "\\" + file, path + "\\" + name);
   });
 };
-const downVod = async (item, index, path) => {
+const downVod = async (item, index, path, indexCookie) => {
   console.log(item, index);
   var details = {
     input: item,
-    speaker_id: 4,
+    speaker_id: 1,
     speed: 1,
     dict_id: 0,
     quality: 1
@@ -99,13 +99,13 @@ const downVod = async (item, index, path) => {
     formBody.push(encodedKey + "=" + encodedValue);
   }
   formBody = formBody.join("&");
-  console.log(formBody);
+  const cookies = fs.readFileSync('./cookie.txt', 'utf8').split('\n');
+  const cookie = cookies[indexCookie || 0]
   const URL = await fetch("https://zalo.ai/api/demo/v1/tts/synthesize", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-      cookie:
-        "zai_did=8k9uAj3FNiTevcSSryzXoYYo6474ocB18BOUGpao; __zi=2000.SSZzejyD0jydXQcYsa00d3xBfxgO71AM8Ddbg8uE7SWetAlXZmWMpY_QeQwA2ns2AjcgfeuD688t.1; _zlang=vn; _gid=GA1.2.1307921538.1690452804; _gat_gtag_UA_158812682_2=1; _ga_TMJX5TWN5E=GS1.1.1690452803.1.1.1690452833.30.0.0; _ga=GA1.1.2048792772.1690452804",
+      cookie: `zai_did=${cookie.trim()}`,
       origin: "https://zalo.ai",
       referer: "https://zalo.ai/products/text-to-audio-converter"
     },
@@ -145,7 +145,7 @@ const toTimeStr = (number) => {
   return moment("2023-01-01 00:00:00").add(Number(number), "millisecond").format("HH:mm:ss.SS");
 };
 
-const createVodFromSub = async (pathFileSub, arrayStr) => {
+const createVodFromSub = async (pathFileSub, arrayStr, cookie) => {
   const arrText = fsExtra.readFileSync(pathFileSub, "utf8").split("\n");
   const name = _.replace(_.last(_.split(pathFileSub, "/")), ".srt", "");
   try {
@@ -176,7 +176,7 @@ const createVodFromSub = async (pathFileSub, arrayStr) => {
   for (let i = 0; i < arr.length; i++) {
     const checkItem = audios.find((au) => au.includes(fotmatNumber(i)));
     if (!checkItem && (!array || array.includes(i))) {
-      await downVod(arr[i], i, "./download/" + _.kebabCase(name));
+      await downVod(arr[i], i, "./download/" + _.kebabCase(name), cookie);
     }
   }
 };
@@ -235,10 +235,10 @@ const concatVod = async (pathFileSub) => {
   }
 };
 
-const createVodFromText = async (pathFileSub) => {
+const createVodFromText = async (pathFileSub, cookie) => {
   const name = _.replace(_.last(_.split(pathFileSub, "/")), ".txt", "");
   let file = fsExtra.readFileSync(pathFileSub, "utf8");
-  fsExtra.mkdirsSync("./download/" + _.kebabCase(name));
+  console.log('length: ', file.length);
   const arr = [];
   try {
     fsExtra.mkdirSync("./download/" + _.kebabCase(name));
@@ -269,7 +269,7 @@ const createVodFromText = async (pathFileSub) => {
       const checkItem = audios.find((au) => au.includes(fotmatNumber(i)));
       if (!checkItem) {
         if (arr[i]) {
-          const url = await downVod(arr[i], i, "./download/" + _.kebabCase(name));
+          const url = await downVod(arr[i], i, "./download/" + _.kebabCase(name), cookie);
           m3u8List.push({ index: i, url })
         } else {
           fs.copyFileSync('rong.mp3', `./download/${_.kebabCase(name)}/${fotmatNumber(i)}.mp3`);
@@ -282,18 +282,52 @@ const createVodFromText = async (pathFileSub) => {
       resolve();
     }, 1000);
   });
-  await Promise.all(m3u8List.map(async (m3u8) => {
-    await promiseExec(`ffmpeg -i ${m3u8.url} -c copy -bsf:a aac_adtstoasc ./download/${_.kebabCase(name)}/${fotmatNumber(m3u8.index)}.mp4`);
-    await promiseExec(`ffmpeg -i ./download/${_.kebabCase(name)}/${fotmatNumber(index)}.mp4 ./download/${_.kebabCase(name)}/${fotmatNumber(m3u8.index)}.mp3`);
-    fsExtra.remove(`./download/${_.kebabCase(name)}/${fotmatNumber(m3u8.index)}.mp4`);
-  }));
+  const chunkM3u8List = _.chunk(m3u8List, 20);
+  for (let i = 0; i < chunkM3u8List.length; i++) {
+    const m3u8List = chunkM3u8List[i];
+    await Promise.all(m3u8List.map(async (m3u8) => {
+      await promiseExec(`ffmpeg -i ${m3u8.url} -c copy -bsf:a aac_adtstoasc ./download/${_.kebabCase(name)}/${fotmatNumber(m3u8.index)}.mp4`);
+      await promiseExec(`ffmpeg -i ./download/${_.kebabCase(name)}/${fotmatNumber(m3u8.index)}.mp4 ./download/${_.kebabCase(name)}/${fotmatNumber(m3u8.index)}.mp3`);
+      fsExtra.remove(`./download/${_.kebabCase(name)}/${fotmatNumber(m3u8.index)}.mp4`);
+    }));
+  }
 };
 
 const clean = async (path) => {
   let files = fsExtra.readdirSync(path);
   files.forEach((file) => {
     const replaces = {
-      '': ['\\*', '\~', '-', '\\(1\\)', '\\(2\\)', '\\(3\\)', '\\(4\\)', '\\(5\\)', '\\(6\\)', '\\(7\\)'],
+      '===========': ['o0o', 'Phụ trách: Vô Tà Team'],
+      '\n===========\n': ['\n[.]{2,}\n', '[*]{3,}', '\n…\n', '\n\. \. \.\n'],
+      '': [
+        "\\*",
+        "~",
+        "-",
+        "\\(1\\)",
+        "\\(2\\)",
+        "\\(3\\)",
+        "\\(4\\)",
+        "\\(5\\)",
+        "\\(6\\)",
+        "\\(7\\)",
+        "\\(8\\)",
+        "\\(9\\)",
+        "\\(10\\)",
+        "\\(11\\)",
+        "\\(12\\)",
+        "\\(13\\)",
+        "\\(14\\)",
+        "\\(15\\)",
+        "\\(16\\)",
+        "\\(17\\)",
+        "\\(18\\)",
+        '<p>',
+        '</p>',
+        '<div>',
+        '</div>',
+        'Nhóm dịch: Tiên Huyễn',
+        'Phụ trách: Vô Tà Team'
+      ],
       '\.': ['[.]{2,}', '…'],
       '\n': ['\n\n', '\n\.\n'],
       '"': ['”'],
@@ -301,11 +335,18 @@ const clean = async (path) => {
       'nói, "': ['nói "'],
       'hỏi, "': ['hỏi "'],
       'mở miệng, "': ['mở miệng "'],
-      'nói tiếp, "': ['nói tiếp "']
+      'nói tiếp, "': ['nói tiếp "'],
     };
     let text = fsExtra.readFileSync(`${path}/${file}`, "utf8");
+    let textarr = _.clone(text).split('\n');
+    for (let index = 0; index < textarr.length; index++) {
+      const str = textarr[index];
+      if (str.includes('Chương') && str.includes(':') && textarr[index + 1] !== '===========') {
+        text = text.replace(str, `===========\n${str}\n===========`);
+      }
+    }
 
-    console.log(`${path}/${file}`, text);
+    // console.log(`${path}/${file}`, text);
     [1, 2, 3, 4, 5].forEach((element) => {
       Object.keys(replaces).forEach((key) => {
         const keys = [...replaces[key], ...replaces[key].map((elm) => elm.toLocaleUpperCase())];
@@ -323,9 +364,9 @@ const param2 = process.argv[4];
 const param3 = process.argv[5];
 
 if (arg === "create") {
-  createVodFromSub(param1, param2);
+  createVodFromSub(param1, param2, param3);
 } else if (arg === "create-text") {
-  createVodFromText(param1);
+  createVodFromText(param1, param2);
 } else if (arg === "concat") {
   concatVod(param1);
 } else if (arg === "concat-text") {
